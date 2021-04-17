@@ -1,0 +1,270 @@
+---
+title: "Test2"
+author: "Ambrose M Malagon Cordero"
+date: "8/7/2020"
+output: html_document
+---
+
+```{r}
+library(readr)
+oak_svc <- read_csv("final_oak1.csv")
+oak_svc <- as.data.frame(oak_svc)
+# Generate the head of the resulting data frame
+oak_svc$year <- as.factor(oak_svc$year)
+head(oak_svc)
+```
+
+```{r}
+library(ggplot2)
+ggplot(oak_svc, aes(x = year, y = REQUESTID, group=year)) + 
+  geom_boxplot(fill = "gray90", color = "gray40", outlier.colour = "#00a2b1") +
+  #scale_y_continuous(expand = c(0,0), limits=c(0, max(dodgers_rev$attend)*1.05), label = comma) +
+  labs(title = "Service Request Counts Variations by Year") +
+  theme_main +
+  theme(axis.ticks = element_blank(),
+        axis.title.x = element_blank(),
+        axis.line.x = element_line(colour="gray20"))
+```
+
+```{r}
+ggplot(oak_svc, aes(x=year, y=REQUESTID, group=year)) + geom_boxplot( fill="skyblue", notch=FALSE) + geom_jitter( size=1, color="orange", width=0.3)
+```
+```{r}
+ggplot(oak_svc, aes(x=oak_svc$REQUESTID)) + 
+  geom_histogram(bins = 20,
+                 col="black", 
+                 fill="skyblue", 
+                 alpha = .2) + 
+  labs(title = "Service Request Counts Distribution") +
+ theme_main +
+  theme(axis.ticks = element_blank(),
+        axis.title.x = element_blank(),
+        axis.line.x = element_line(colour="gray20"))
+```
+
+```{r}
+oak_svc2 <- read_csv("final_oak2.csv")
+oak_svc2 <- as.data.frame(oak_svc2)
+# Generate the head of the resulting data frame
+head(oak_svc2)
+```
+
+```{r}
+library(corrplot)
+library(RColorBrewer)
+#M <-cor(oak_svc2, method = 'spearman')
+#corrplot(M, type="upper", order="hclust",
+#         col=brewer.pal(n=8, name="RdYlBu"))
+
+M <-cor(oak_svc2[, sapply(oak_svc2, is.numeric)],
+    use = "complete.obs", method = "pearson")
+corrplot(M, type="upper", order="hclust")
+```
+
+```{r}
+oak_svc3 <- read_csv("final_oak23.csv")
+oak_sv3 <- as.data.frame(oak_svc3)
+# Generate the head of the resulting data frame
+head(oak_svc3)
+```
+
+
+```{r}
+library('MASS')
+table(oak_svc3$STATUS, oak_svc3$BEAT)
+```
+
+```{r}
+table(oak_svc3$STATUS, oak_svc3$REQCATEGORY)
+```
+
+```{r}
+oak_svc5 <- read_csv("final_oak5.csv")
+oak_svc5 <- as.data.frame(oak_svc5)
+# Generate the head of the resulting data frame
+head(oak_svc5)
+```
+
+```{r}
+poisson.model <- glm(REQUESTID ~ ., oak_svc5 ,family = poisson(link = "log"))
+```
+
+```{r}
+summary(poisson.model)
+```
+
+```{r}
+# Split the data into train and test sets.
+smp_size <- floor(0.70 * nrow(oak_svc5))
+
+set.seed(123)
+train_ind <- sample(seq_len(nrow(oak_svc5)), size = smp_size)
+
+train <- oak_svc5[train_ind, ]
+test <- oak_svc5[-train_ind, ]
+train1 <- oak_svc5[train_ind, ]
+test1 <- oak_svc5[-train_ind, ]
+```
+
+```{r}
+model <- glm(REQUESTID ~ ., train ,family = poisson(link = "log"))
+summary(model)
+```
+
+```{r}
+dispersiontest(model)
+```
+
+```{r}
+# Create the predictions
+PredictedCounts <- predict(model, test, type="response")
+predicted <- as.data.frame(PredictedCounts)
+# predicted <- rename(predicted, c("values"="PredictedCounts"))
+predicted <- round(predicted['PredictedCounts'])
+test['PredictedCounts'] <- predicted['PredictedCounts']
+predict_vs_actual_df <- test
+#predict_vs_actual_df['DateTimeRequest'] <- test_values['DateTimeRequest']
+# Add the predicted values to the test data
+#predict_vs_actual_df <- test %>% 
+#  cbind(data.frame(`Predicted Counts` = predicted)) %>% 
+#  mutate(`predicted.ReqCount` = round(`Predicted.Counts`))
+# Add the data
+predict_vs_actual_df
+```
+```{r}
+keep <- c('year','REQUESTID','PredictedCounts')
+predict_vs_actual_df2 <- predict_vs_actual_df[keep]
+sum_predicted <- aggregate(.~year, predict_vs_actual_df2, sum)
+#sum_predicted$year <- as.factor(sum_predicted$year)
+sum_predicted
+```
+
+```{r}
+ggplot(sum_predicted, aes(x=year)) + 
+  geom_line(aes(y = REQUESTID), color = "steelblue") + 
+  geom_line(aes(y = PredictedCounts), color="red", linetype="twodash") + theme_main + labs(title = "Poisson Model - Actual vs Predicted Values") + scale_x_continuous(breaks = c(2010,2011,2012,2013,2014,2015,2016,2017,2018,2019))
+# + geom_point(aes(y = REQUESTID))
+  
+```
+
+
+```{r}
+library(AER)
+dispersiontest(poisson.model)
+```
+
+```{r}
+m1 <- glm.nb(REQUESTID ~ ., oak_svc5 )
+```
+
+```{r}
+summary(m1)
+```
+
+```{r}
+modelnb <- glm.nb(REQUESTID ~ ., train1)
+summary(modelnb)
+```
+
+```{r}
+# Create the predictions
+PredictedCounts1 <- predict(modelnb, test1, type="response")
+predicted1 <- as.data.frame(PredictedCounts1)
+# predicted <- rename(predicted, c("values"="PredictedCounts"))
+predicted1 <- round(predicted1['PredictedCounts1'])
+test1['PredictedCounts'] <- predicted1['PredictedCounts1']
+predict_vs_actual_df1 <- test1
+#predict_vs_actual_df['DateTimeRequest'] <- test_values['DateTimeRequest']
+# Add the predicted values to the test data
+#predict_vs_actual_df <- test %>% 
+#  cbind(data.frame(`Predicted Counts` = predicted)) %>% 
+#  mutate(`predicted.ReqCount` = round(`Predicted.Counts`))
+# Add the data
+predict_vs_actual_df1
+```
+```{r}
+keep <- c('year','REQUESTID','PredictedCounts')
+predict_vs_actual_df3 <- predict_vs_actual_df1[keep]
+sum_predicted1 <- aggregate(.~year, predict_vs_actual_df3, sum)
+#sum_predicted$year <- as.factor(sum_predicted$year)
+sum_predicted1
+```
+
+
+
+```{r}
+ggplot(sum_predicted1, aes(x=year)) + 
+  geom_line(aes(y = REQUESTID), color = "steelblue") + 
+  geom_line(aes(y = PredictedCounts), color="red", linetype="twodash") + theme_main + labs(title = "Negative Binomial Regression - Actual vs Predicted Values") + scale_x_continuous(breaks = c(2010,2011,2012,2013,2014,2015,2016,2017,2018,2019))
+# + geom_point(aes(y = REQUESTID))
+  
+```
+
+
+
+```{r}
+
+oak_svc6 <- read_csv("final_oak2.csv")
+oak_svc6 <- as.data.frame(oak_svc6)
+# Generate the head of the resulting data frame
+#oak_svc$year <- as.factor(oak_svc$year)
+head(oak_svc6)
+```
+
+```{r}
+# Split the data into train and test sets.
+library(dplyr)
+rfdata <- sample_n(oak_svc6,10000)
+smp_size1 <- floor(0.70 * nrow(rfdata))
+
+set.seed(123)
+train_ind <- sample(seq_len(nrow(rfdata)), size = smp_size1)
+
+trainrf <- rfdata[train_ind, ]
+testrf <- rfdata[-train_ind, ]
+
+```
+
+
+
+```{r}
+library(randomForest)
+rf = randomForest(REQUESTID ~ ., data = trainrf)
+```
+
+```{r}
+summary(rf)
+```
+
+```{r}
+# Create the predictions
+PredictedCountsrf <- predict(rf, testrf)
+predictedrf <- as.data.frame(PredictedCountsrf)
+# predicted <- rename(predicted, c("values"="PredictedCounts"))
+predictedrf <- round(predictedrf['PredictedCountsrf'])
+testrf['PredictedCounts'] <- predictedrf['PredictedCountsrf']
+predict_vs_actual_dfrf <- testrf
+#predict_vs_actual_df['DateTimeRequest'] <- test_values['DateTimeRequest']
+# Add the predicted values to the test data
+#predict_vs_actual_df <- test %>% 
+#  cbind(data.frame(`Predicted Counts` = predicted)) %>% 
+#  mutate(`predicted.ReqCount` = round(`Predicted.Counts`))
+# Add the data
+predict_vs_actual_dfrf
+```
+
+
+```{r}
+keep <- c('year','REQUESTID','PredictedCounts')
+predict_vs_actual_dfrf2 <- predict_vs_actual_dfrf[keep]
+sum_predicted2 <- aggregate(.~year, predict_vs_actual_dfrf2, sum)
+#sum_predicted$year <- as.factor(sum_predicted$year)
+sum_predicted2
+```
+```{r}
+ggplot(sum_predicted2, aes(x=year)) + 
+  geom_line(aes(y = REQUESTID), color = "steelblue") + 
+  geom_line(aes(y = PredictedCounts), color="red", linetype="twodash") + theme_main + labs(title = "Random Forest - Actual vs Predicted Values") + scale_x_continuous(breaks = c(2010,2011,2012,2013,2014,2015,2016,2017,2018,2019))
+# + geom_point(aes(y = REQUESTID))
+  
+```
